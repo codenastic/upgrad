@@ -1,5 +1,6 @@
 package ImageHoster.controller;
 
+import ImageHoster.model.Comment;
 import ImageHoster.model.Image;
 import ImageHoster.model.Tag;
 import ImageHoster.model.User;
@@ -13,9 +14,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.*;
 
 @Controller
@@ -45,11 +48,12 @@ public class ImageController {
     //Also now you need to add the tags of an image in the Model type object
     //Here a list of tags is added in the Model type object
     //this list is then sent to 'images/image.html' file and the tags are displayed
-    @RequestMapping("/images/{id}/{title}")
-    public String showImage(@PathVariable("title") String title, @PathVariable("id") int imageId, Model model) {
+    @RequestMapping("/images/{imageId}/{title}")
+    public String showImage(@PathVariable("title") String title, @PathVariable("imageId") int imageId, Model model) {
         Image image = imageService.getImage(imageId);
         model.addAttribute("image", image);
         model.addAttribute("tags", image.getTags());
+        model.addAttribute("comments", imageService.getImageComments(String.valueOf(imageId)));
         return "images/image";
     }
 
@@ -105,6 +109,7 @@ public class ImageController {
             model.addAttribute("tags", image.getTags());
             return "images/image";
         }
+        model.addAttribute("comments", imageService.getImageComments(Integer.toString(imageId)));
         return "images/edit";
     }
 
@@ -150,7 +155,7 @@ public class ImageController {
     public String deleteImageSubmit(@RequestParam(name = "imageId") Integer imageId, Model model, HttpSession session) {
         Image image = imageService.getImage(imageId);
         User user = (User) session.getAttribute("loggeduser");
-
+        //Check if user was owner or not, Delete only if user was a owner.
         if (!image.getUser().getId().equals(user.getId())) {
             model.addAttribute("image", image);
             String error = "Only the owner of the image can delete the image";
@@ -158,6 +163,7 @@ public class ImageController {
             model.addAttribute("tags", image.getTags());
             return "images/image";
         }
+        model.addAttribute("comments", imageService.getImageComments(Integer.toString(imageId)));
         imageService.deleteImage(imageId);
         return "redirect:/images";
     }
@@ -203,5 +209,21 @@ public class ImageController {
         tagString.append(lastTag.getName());
 
         return tagString.toString();
+    }
+
+    @RequestMapping(value = "/image/{imageId}/{imageTitle}/comments")
+    public String addImageComment(@PathVariable("imageId") String imageId, @PathVariable("imageTitle") String imageTitle, @RequestParam("comment") String commentText, HttpSession session, Model model) {
+        User user = (User) session.getAttribute("loggeduser");
+        Comment comment = new Comment();
+        comment.setText(commentText);
+        comment.setCreatedDate(LocalDate.now());
+        comment.setUser(user);
+        Image image = imageService.getImage(Integer.parseInt(imageId));
+        comment.setImage(image);
+        imageService.addImageComment(comment);
+        model.addAttribute("image", image);
+        model.addAttribute("tags", image.getTags());
+        model.addAttribute("comments", imageService.getImageComments(imageId));
+        return "/images/image";
     }
 }
